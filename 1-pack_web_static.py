@@ -7,7 +7,7 @@ from datetime import datetime
 import os
 
 env.user = 'ubuntu'
-env.hosts = ['34.74.100.166', '34.139.37.135']
+env.hosts = ['54.82.173.1', '54.83.128.241']
 
 def do_pack():
     """This function compresses and archives files"""
