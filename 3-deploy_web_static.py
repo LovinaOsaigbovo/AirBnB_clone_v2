@@ -8,7 +8,7 @@ from datetime import datetime
 
 env.hosts = ['54.82.173.1', '54.83.128.241']
 env.user 'ubuntu'
-env.key_filename = '~/.ssh/id_rsa.pub'
+env.key_filename = '~/.ssh/id_rsa'
 
 def do_pack():
     """generates a tgz archive"""
