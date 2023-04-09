@@ -1,52 +1,78 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """
-Script that deploys archive to webservers
+do_pack(): Generates a .tgz archive from the
+contents of the web_static folder
+do_deploy(): Distributes an archive to a web server
+deploy (): Creates and distributes an archive to a web server
 """
-from fabric.api import *
-import os
-from datetime import datetime
 
-env.hosts = ['54.82.173.1', '54.83.128.241']
-env.user 'ubuntu'
-env.key_filename = '~/.ssh/id_rsa'
+from fabric.operations import local, run, put
+from datetime import datetime
+import os
+from fabric.api import env
+import re
+
+
+env.hosts = ['3.90.83.66', '100.25.205.254']
+
 
 def do_pack():
-    """generates a tgz archive"""
-    try:
-        if not os.path.exists("versions"):
-            os.makedirs("versions")
-        t = datetime.now()
-        timestamp = "{}{}{}{}{}{}".format(t.year, t.month, t.day, t.hour, t.minute, t.second)
-        archive_path = "versions/web_static_{}.tgz".format(timestamp)
-        local("tar -cvzf {} web_static".format(archive_path))
-        return archive_path
-    except:
+    """Function to compress files in an archive"""
+    local("mkdir -p versions")
+    filename = "versions/web_static_{}.tgz".format(datetime.strftime(
+                                                   datetime.now(),
+                                                   "%Y%m%d%H%M%S"))
+    result = local("tar -cvzf {} web_static"
+                   .format(filename))
+    if result.failed:
         return None
+    return filename
+
 
 def do_deploy(archive_path):
-    """distributes an archive to the two web servers"""
+    """Function to distribute an archive to a server"""
     if not os.path.exists(archive_path):
         return False
-
-    try:
-        archive_filename = os.path.basename(archive_path)
-        archive_basename = os.path.splitext(archive_filename)[0]
-        release_path = "/data/web_static/releases/{}".format(archive_basename)
-        put(archive_path, "/tmp/")
-        run("sudo mkdir -p {}".format(release_path))
-        run("sudo tar xzf /tmp/{} -C {} --strip-components=1".format(archive_filename, release_path))
-        run("sudo rm /tmp/{}".format(archive_filename))
-        run("sudo mv {}/web_static/* {}/".format(release_path, release_path))
-        run("sudo rm -rf {}/web_static".format(release_path))
-        run("sudo rm -rf /data/web_static/current")
-        run("sudo ln -s {} /data/web_static/current".format(release_path))
-        return True
-    except:
+    rex = r'^versions/(\S+).tgz'
+    match = re.search(rex, archive_path)
+    filename = match.group(1)
+    res = put(archive_path, "/tmp/{}.tgz".format(filename))
+    if res.failed:
         return False
+    res = run("mkdir -p /data/web_static/releases/{}/".format(filename))
+    if res.failed:
+        return False
+    res = run("tar -xzf /tmp/{}.tgz -C /data/web_static/releases/{}/"
+              .format(filename, filename))
+    if res.failed:
+        return False
+    res = run("rm /tmp/{}.tgz".format(filename))
+    if res.failed:
+        return False
+    res = run("mv /data/web_static/releases/{}"
+              "/web_static/* /data/web_static/releases/{}/"
+              .format(filename, filename))
+    if res.failed:
+        return False
+    res = run("rm -rf /data/web_static/releases/{}/web_static"
+              .format(filename))
+    if res.failed:
+        return False
+    res = run("rm -rf /data/web_static/current")
+    if res.failed:
+        return False
+    res = run("ln -s /data/web_static/releases/{}/ /data/web_static/current"
+              .format(filename))
+    if res.failed:
+        return False
+    print('New version deployed!')
+    return True
+
 
 def deploy():
-    """creates and distributes an archive to the web servers"""
-    archive_path = do_pack()
-    if not archive_path:
+    """Creates and distributes an archive to a web server"""
+    filepath = do_pack()
+    if filepath is None:
         return False
-    return do_deploy(archive_path)
+    d = do_deploy(filepath)
+    return d
